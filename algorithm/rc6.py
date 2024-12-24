@@ -3,7 +3,7 @@ import struct
 
 wsl
 
-class RC6(SymmetricEncryption):
+class RC6(SymmetricEnyption):
     def encrypt(self, plaintext: bytes, key: bytes) -> bytes:
         """Шифрование RC6"""
         # Реализация RC6 из предыдущего примера
