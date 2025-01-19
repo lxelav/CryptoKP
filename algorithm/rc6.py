@@ -1,64 +1,125 @@
-from abc import ABC, abstractmethod
+from algorithm import symmetricCipherABC
 import struct
 
-wsl
+class RC6(symmetricCipherABC.SymmetricCipher):
+    def __init__(self, R, key, strip_extra_nulls=False, bytes_count=16):
+        self.bytes_count = self.block_size = bytes_count
+        self.w = (bytes_count // 4) * 8
+        self.R = R
+        self.key = key
+        self.strip_extra_nulls = strip_extra_nulls
 
-class RC6(SymmetricEnyption):
-    def encrypt(self, plaintext: bytes, key: bytes) -> bytes:
-        """Шифрование RC6"""
-        # Реализация RC6 из предыдущего примера
-        plaintext = self.pad_data(plaintext)
-        L, R = struct.unpack(">2I", plaintext)
-        S = self.key_expansion(key)
+        self.T = 2*R + 4
+        self.w8 = self.w // 8
+        self.mod = 2 ** self.w
+        self.mask = self.mod - 1
+        self.b = len(key)
+        self.round_keys = []
 
-        for i in range(20):  # 20 раундов RC6
-            L = self.rotate_left(L ^ S[2 * i], 5) + R
-            R = self.rotate_left(R ^ S[2 * i + 1], 5) + L
+        self.set_key()
 
-        return struct.pack(">2I", L, R)
+    def set_key(self, key=b"0"):
+        self.__keyAlign()
+        self.__keyExtend()
+        self.__shuffle()
 
-    def decrypt(self, ciphertext: bytes, key: bytes) -> bytes:
-        """Дешифрование RC6"""
-        ciphertext = self.pad_data(ciphertext)
-        L, R = struct.unpack(">2I", ciphertext)
-        S = self.key_expansion(key)
+    def __lshift(self, val, n):
+        n %= self.w
+        return ((val << n) & self.mask) | ((val & self.mask) >> (self.w - n)) & self.mask
 
-        for i in range(19, -1, -1):
-            R = self.rotate_right(R - L, 5) ^ S[2 * i + 1]
-            L = self.rotate_right(L - R, 5) ^ S[2 * i]
+    def __rshift(self, val, n):
+        n %= self.w
+        return ((val & self.mask) >> n) | (val << (self.w - n) & self.mask)
 
-        return struct.pack(">2I", L, R)
+    def __const(self):
+        if self.w == 16:
+            return 0xB7E1, 0x9E37 #P, Q values
+        elif self.w == 32:
+            return 0xB7E15163, 0x9E3779B9
+        elif self.w == 64:
+            return 0xB7E151628AED2A6B, 0x9E3779B97F4A7C15
 
-    def pad_data(self, data):
-        if len(data) < 8:
-            data += b'\x00' * (8 - len(data))
-        elif len(data) > 8:
-            data = data[:8]
-        return data
+    def __keyAlign(self):
+        if self.b == 0:  # key is empty
+            self.c = 1
+        elif self.b % self.w8:
+            self.key += b'\x00' * (self.w8 - self.b % self.w8)  # fill key with \x00 bytes
+            self.b = len(self.key)
+            self.c = self.b // self.w8
+        else:
+            self.c = self.b // self.w8
 
-    def rotate_left(self, value, n):
-        return ((value << n) | (value >> (32 - n))) & 0xFFFFFFFF
+        L = [0] * self.c
+        for i in range(self.b - 1, -1, -1):
+            L[i // self.w8] = (L[i // self.w8] << 8) + self.key[i]
+        self.L = L
 
-    def rotate_right(self, value, n):
-        return ((value >> n) | (value << (32 - n))) & 0xFFFFFFFF
+    def __keyExtend(self):
+        P, Q = self.__const()
+        self.S = [(P + i * Q) % self.mod for i in range(self.T)]
 
-    def key_expansion(self, key):
-        return [0] * 44  # Простая заглушка
+    def __shuffle(self):
+        i, j, A, B = 0, 0, 0, 0
+        for k in range(3 * max(self.c, self.T)):
+            A = self.S[i] = self.__lshift((self.S[i] + A + B), 3)
+            B = self.L[j] = self.__lshift((self.L[j] + A + B), A + B)
+            i = (i + 1) % self.T
+            j = (j + 1) % self.c
+
+        self.round_keys = self.S
+
+    def encrypt(self, plaintext: bytes) -> bytes:
+        """Шифрование блока данных."""
+        if len(plaintext) * 8 != 4 * self.w: #Проверка блока на 128 бит
+            raise ValueError(f"Размер блока должен быть {self.bytes_count} байт (128 бит)")
+
+        #Преобразование входных данных в 4 32-битных слов
+        A, B, C, D = struct.unpack('<4I', plaintext)
+
+        B = (B + self.round_keys[0]) & 0xFFFFFFFF
+        D = (D + self.round_keys[1]) & 0xFFFFFFFF
+
+        # r(20) раундов шифрования
+        for i in range(1, self.R+1):
+            t = self.__lshift(B * (2*B + 1), 5)
+            u = self.__lshift((D * (2*D + 1)), 5)
+
+            A = (self.__lshift(A ^ t, u) + self.round_keys[2 * i]) & 0xFFFFFFFF
+            C = (self.__lshift(C ^ u, t) + self.round_keys[2*i + 1]) & 0xFFFFFFFF
+
+            A, B, C, D = B, C, D, A
+
+        A = (A + self.round_keys[2*self.R + 2]) & 0xFFFFFFFF
+        C = (C + self.round_keys[2*self.R + 3]) & 0xFFFFFFFF
+
+        return struct.pack('<4I', A, B, C, D)
+
+    def decrypt(self, ciphertext: bytes) -> bytes:
+        """Расшифровка блока данных."""
+        if len(ciphertext) * 8 != 4*self.w:
+            raise ValueError(f"Размер блока должен быть {self.bytes_count} байт (128 бит)")
+
+        # Преобразование входных данных в 4 32-битных слова
+        A, B, C, D = struct.unpack('<4I', ciphertext)
+        print("A, B, C, D: ", A, B, C, D)
+
+        C = (C - self.round_keys[2*self.R + 3]) & 0xFFFFFFFF
+        A = (A - self.round_keys[2*self.R + 2]) & 0xFFFFFFFF
+
+        # 20 раундов расшифрования
+        for i in range(20, 0, -1):
+            A, B, C, D = D, A, B, C
+
+            u = self.__lshift((D * (2*D + 1)), 5)
+            t = self.__lshift((B * (2*B + 1)), 5)
+
+            C = self.__rshift((C - self.round_keys[2*i + 1]), t) ^ u
+            A = self.__rshift((A - self.round_keys[2*i]), u) ^ t
+
+        D = (D - self.round_keys[1]) & 0xFFFFFFFF
+        B = (B - self.round_keys[0]) & 0xFFFFFFFF
+
+        return struct.pack('<4I', A, B, C, D)
 
 
-# Пример использования:
 
-def encrypt_and_decrypt_demo():
-    key = b'1234567890abcdef'  # Ключ для AES и RC6 (16 байт)
-    plaintext = b'Hello, this is a test message!'
-
-    # Работа с RC6
-    rc6 = RC6()
-    rc6_encrypted = rc6.encrypt(plaintext, key)
-    print(f"RC6 Encrypted: {rc6_encrypted}")
-    rc6_decrypted = rc6.decrypt(rc6_encrypted, key)
-    print(f"RC6 Decrypted: {rc6_decrypted}")
-
-
-if __name__ == "__main__":
-    encrypt_and_decrypt_demo()
