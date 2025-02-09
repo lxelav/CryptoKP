@@ -1,4 +1,4 @@
-from algorithm import symmetricCipherABC
+import symmetricCipherABC
 
 class Serpent(symmetricCipherABC.SymmetricCipher):
     def __init__(self, key: bytes):

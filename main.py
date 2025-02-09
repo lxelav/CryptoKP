@@ -1,4 +1,4 @@
-from algorithm import rc6, cryptoContext, seprent, deffiehellman
+from gRPC import cryptoContext, deffiehellman, rc6, serpent
 
 #RC6
 key = b"0123456789abcdefxfsdfewfdvdffwr"  # 16 байт
@@ -29,9 +29,9 @@ b_private, b_public = deffiehellman.diffie_hellman(p, g)
 shared_secret_a = deffiehellman.compute_shared_secret(b_public, a_private, p)
 shared_secret_b = deffiehellman.compute_shared_secret(a_public, b_private, p)
 
-key = bytes.fromhex(deffiehellman.hash_shared_key(shared_secret_a))
+key = deffiehellman.hash_shared_key(shared_secret_a)
 iv = b"1234567890abcdef"   # 16 байт
-cipher = seprent.Serpent(key=key)
+cipher = seprent.Serpent(key=b'mykeys123124')
 context = cryptoContext.CryptoContext(cipher, mode="ECB", padding=cryptoContext.PaddingScheme.PKCS7, iv=iv)
 
 plaintext = b"helloworld"
@@ -41,21 +41,3 @@ print(ciphertext)
 print(decrypted)
 
 assert plaintext == decrypted, "Ошибка в шифровании/расшифровании"
-
-# Шифрование файла
-with open("data/test_input.txt", "rb") as f:
-    image_bytes = f.read()
-
-encrypted_bytes = context.encrypt(image_bytes)
-with open("encrypted_text.bin", "wb") as f:
-    f.write(encrypted_bytes)
-
-# Расшифрование file
-with open("encrypted_text.bin", "rb") as f:
-    encrypted_bytes = f.read()
-
-decrypted_bytes = context.decrypt(encrypted_bytes)
-with open("decrypted_text.txt", "wb") as f:
-    f.write(decrypted_bytes)
-
-print("Шифрование и расшифрование завершены!")

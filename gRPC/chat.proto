@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package chat;
+
+service AuthService {
+  rpc Register (RegisterRequest) returns (AuthResponse);
+  rpc Login (LoginRequest) returns (AuthResponse);
+}
+
+service ChatService {
+  rpc CreateRoom (CreateRoomRequest) returns (RoomResponse);
+  rpc JoinRoom (JoinRoomRequest) returns (JoinRoomResponse);
+  rpc SendMessage (stream MessageRequest) returns (stream MessageResponse);
+  rpc ReceiveMessages (RoomRequest) returns (stream MessageResponse);
+  rpc LeaveRoom(RoomRequest) returns (RoomResponse);  // Добавленный метод
+  rpc SendPublicKey(SendPublicKeyRequest) returns (RoomResponse);  // Добавленный метод
+  rpc GenerateSessionKey(GenerateKeyRequest) returns (GenerateKeyResponse);  // Добавленный метод
+}
+
+message RoomRequest {
+    string room_id = 1;  // Идентификатор комнаты
+    string username = 2;  // Добавлено поле username
+}
+
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message AuthResponse {
+  string token = 1;
+}
+
+message AuthRequest {
+  string username = 1;
+  string password = 2;
+}
+
+message CreateRoomRequest {
+  string room_id = 1;
+  string algorithm = 2;
+  string mode = 3;
+  string padding = 4;
+}
+
+message JoinRoomRequest {
+  string room_id = 1;
+  string username = 2;
+}
+
+message JoinRoomResponse {
+    bytes p = 1;
+    uint64 g = 2;
+}
+
+message SendPublicKeyRequest {
+    string room_id = 1;
+    string username = 2;
+    bytes public_key = 3;
+}
+
+message RoomResponse {
+    string message = 1;
+    int32 count_user = 2;
+    string room_id = 3;
+    string algorithm = 4;
+    string mode = 5;
+    string padding = 6;
+}
+
+message GenerateKeyRequest {
+    string room_id = 1;
+    string username = 2;
+}
+
+message GenerateKeyResponse {
+    bytes other_public_key = 1;
+}
+
+message MessageRequest {
+  string room_id = 1;
+  string sender = 2;
+  bytes encrypted_message = 3;
+  bytes image_data = 4;
+}
+
+message MessageResponse {
+  string room_id = 1;
+  string sender = 2;
+  bytes encrypted_message = 3;
+  bytes image_data = 4;
+}

@@ -28,6 +28,9 @@ class CryptoContext:
         if mode == "CTR" and nonce is None:
             raise ValueError("Nonce должен быть предоставлен для режима CTR.")
 
+    def set_key(self, key:bytes):
+        self.cipher.set_key(key)
+
     def encrypt(self, plaintext: bytes) -> bytes:
         """Шифрование данных."""
         padded_data = self._apply_padding(plaintext)

@@ -1,9 +1,10 @@
-from algorithm import symmetricCipherABC
+import symmetricCipherABC
 import struct
 
 class RC6(symmetricCipherABC.SymmetricCipher):
     def __init__(self, R, key, strip_extra_nulls=False, bytes_count=16):
         self.bytes_count = self.block_size = bytes_count
+        self.block_size = bytes_count
         self.w = (bytes_count // 4) * 8
         self.R = R
         self.key = key
@@ -19,6 +20,8 @@ class RC6(symmetricCipherABC.SymmetricCipher):
         self.set_key()
 
     def set_key(self, key=b"0"):
+        if key != b"0":
+            self.key = key
         self.__keyAlign()
         self.__keyExtend()
         self.__shuffle()
@@ -101,7 +104,6 @@ class RC6(symmetricCipherABC.SymmetricCipher):
 
         # Преобразование входных данных в 4 32-битных слова
         A, B, C, D = struct.unpack('<4I', ciphertext)
-        print("A, B, C, D: ", A, B, C, D)
 
         C = (C - self.round_keys[2*self.R + 3]) & 0xFFFFFFFF
         A = (A - self.round_keys[2*self.R + 2]) & 0xFFFFFFFF

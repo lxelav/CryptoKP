@@ -44,7 +44,7 @@ def hash_shared_key(shared_key: int):
     :param shared_key:
     :return:
     """
-    return  hashlib.sha256(str(shared_key).encode()).hexdigest()
+    return bytes.fromhex(hashlib.sha256(str(shared_key).encode()).hexdigest())
 
 #Это просто маленькое тестирование
 if __name__ == "__main__":
