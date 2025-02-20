@@ -2,9 +2,6 @@ import hashlib
 import random
 from sympy import nextprime
 
-
-#TODO: Использовать мб библиотеку для генератора и большого простого числа, но пока и так пойдет
-
 def generate_large_prime(bits=512):
     """
     Генерация большого простого числа для p

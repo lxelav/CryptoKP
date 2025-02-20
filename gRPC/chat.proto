@@ -87,6 +87,8 @@ message MessageRequest {
   string sender = 2;
   bytes encrypted_message = 3;
   bytes image_data = 4;
+  bytes iv = 5;
+  bytes nonce = 6;
 }
 
 message MessageResponse {
@@ -94,4 +96,6 @@ message MessageResponse {
   string sender = 2;
   bytes encrypted_message = 3;
   bytes image_data = 4;
+  bytes iv = 5;
+  bytes nonce = 6;
 }

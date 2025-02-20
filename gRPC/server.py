@@ -142,7 +142,6 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
             context.set_details("Комната не найдена")
             return chat_pb2.RoomResponse()
 
-
         leave_message = chat_pb2.MessageResponse(
             room_id=request.room_id,
             sender="System",
@@ -218,6 +217,8 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
                         sender=message.sender,
                         encrypted_message=message.encrypted_message,
                         image_data=message.image_data,
+                        iv=message.iv,
+                        nonce=message.nonce,
                     )
             else:
                 #Текстовое сообщение
@@ -225,6 +226,8 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
                     room_id=message.room_id,
                     sender=message.sender,
                     encrypted_message=message.encrypted_message,
+                    iv=message.iv,
+                    nonce=message.nonce,
                 )
 
             for username, queue in room.subscribers:
@@ -299,7 +302,7 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     chat_pb2_grpc.add_AuthServiceServicer_to_server(AuthService(), server)
     chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatService(), server)
-    server.add_insecure_port("[::]:80800")
+    server.add_insecure_port("[::]:8080")
     server.start()
     print("Server started on port 8080")
     server.wait_for_termination()

@@ -1,6 +1,6 @@
+import os
 import sys
 import threading
-import time
 
 import grpc
 from PyQt6.QtCore import Qt
@@ -25,7 +25,7 @@ padding_dict = {
 
 class GRPCClient:
     def __init__(self):
-        self.channel = grpc.insecure_channel("localhost:80800")
+        self.channel = grpc.insecure_channel("localhost:8080")
         self.auth_stub = chat_pb2_grpc.AuthServiceStub(self.channel)
         self.chat_stub = chat_pb2_grpc.ChatServiceStub(self.channel)
 
@@ -430,12 +430,13 @@ class JoinRoomWindow(QMainWindow):
                     iv,
                 )
             elif room_response.mode == "CTR":
-                nonce = None
+                nonce = 12345
+                nonce_bytes = nonce.to_bytes(8, 'big')
                 self.grpc_client.cryptoContext[room_response.room_id] = cc.CryptoContext(
                     algo_dict[room_response.algorithm.lower()],
                     room_response.mode.upper(),
                     padding_dict[room_response.padding.upper()],
-                    nonce=nonce,
+                    nonce=nonce_bytes,
                 )
             else:
                 self.grpc_client.cryptoContext[room_response.room_id] = cc.CryptoContext(
@@ -708,6 +709,12 @@ class ChatWindow(QMainWindow):
                 print(f"[{response.sender}]: {response.encrypted_message}")
 
                 if self.grpc_client.username != response.sender:
+                    mode = self.grpc_client.cryptoContext[room_id].mode
+                    if mode != "ECB" and mode != "CTR":
+                        self.grpc_client.cryptoContext[room_id].iv = response.iv
+                    elif mode == "CTR":
+                        self.grpc_client.cryptoContext[room_id].nonce = response.nonce
+
                     if response.image_data:
                         #Обработка изображений
                         encrypted_image_path = f"[{response.sender}]received_encrypted_image.enc"
@@ -746,6 +753,13 @@ class ChatWindow(QMainWindow):
         if not message:
             return
 
+        mode = self.grpc_client.cryptoContext[self.active_room].mode
+        if mode != "ECB" and mode != "CTR":
+            self.grpc_client.cryptoContext[self.active_room].iv = os.urandom(16)
+        elif mode == "CTR":
+            self.grpc_client.cryptoContext[self.active_room].nonce = os.urandom(8)
+
+
         message_encode = self.grpc_client.cryptoContext[self.active_room].encrypt(message.encode())
 
         try:
@@ -755,6 +769,8 @@ class ChatWindow(QMainWindow):
                     sender=self.grpc_client.username,
                     encrypted_message=message_encode,
                     image_data=b'',
+                    iv=self.grpc_client.cryptoContext[self.active_room].iv,
+                    nonce=self.grpc_client.cryptoContext[self.active_room].nonce
                 )
                 print("Yielding message:", msg, "\n\n")
                 yield msg
@@ -813,6 +829,8 @@ class ChatWindow(QMainWindow):
                     sender=self.grpc_client.username,
                     encrypted_message=encrypted_file_data,
                     image_data=b'',
+                    iv=self.grpc_client.cryptoContext[self.active_room].iv,
+                    nonce=self.grpc_client.cryptoContext[self.active_room].nonce
                 )
                 yield msg
 
@@ -857,6 +875,8 @@ class ChatWindow(QMainWindow):
                     sender=self.grpc_client.username,
                     encrypted_message=b'',
                     image_data=image_data,
+                    iv=self.grpc_client.cryptoContext[self.active_room].iv,
+                    nonce=self.grpc_client.cryptoContext[self.active_room].nonce
                 )
                 #print("Yielding message:", msg)
                 yield msg
